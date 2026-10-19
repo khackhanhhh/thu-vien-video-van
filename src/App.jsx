@@ -218,7 +218,7 @@ export default function App() {
       <header className="topbar">
         <a className="brand" href="#">
           <span className="brand-icon">▶</span>
-          Video<span className="brand-accent">Library</span>
+          Video Ứng dụng AI trong dạy học Văn<span className="brand-accent"></span>
         </a>
 
         <div className="top-actions">
@@ -334,19 +334,15 @@ export default function App() {
             <span className="eyebrow">KHO VIDEO CỦA BẠN</span>
 
             <h1>
-              Mọi câu chuyện,
+              Mỗi tác phẩm,
               <br />
               <span>trong một thư viện.</span>
             </h1>
 
             <p>
-              Khám phá và thưởng thức những video được tuyển chọn,
+              Khám phá và tìm hiểu những tác phẩm văn học,
               ở bất cứ đâu và trên mọi thiết bị.
             </p>
-
-            <a href="#library" className="hero-link">
-              Khám phá thư viện <span>↓</span>
-            </a>
           </div>
 
           <div className="hero-art" aria-hidden="true">
@@ -361,7 +357,7 @@ export default function App() {
           <div className="section-heading">
             <div>
               <span className="eyebrow">THƯ VIỆN</span>
-              <h2>Video mới nhất</h2>
+              <h2>Tác phẩm văn học</h2>
             </div>
 
             <input
