@@ -266,11 +266,37 @@ a {
   overflow: hidden;
 }
 
-.video-player video {
+/* Video trong thư viện: click để mở popup */
+.video-player-clickable {
+  position: relative;
+  cursor: pointer;
+}
+
+.video-player-clickable video {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
+  pointer-events: none;
+}
+
+.video-play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 38px;
+  background: rgba(0, 0, 0, .12);
+  opacity: 0;
+  transition: opacity .2s ease;
+  pointer-events: none;
+}
+
+.video-player-clickable:hover .video-play-overlay,
+.video-player-clickable:focus-visible .video-play-overlay {
+  opacity: 1;
 }
 
 .video-info {
@@ -451,6 +477,94 @@ footer > span {
   font-size: 11px;
 }
 
+/* ==============================
+   POPUP VIDEO
+   ============================== */
+
+.video-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3vh 3vw;
+  background: rgba(5, 9, 18, .86);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  animation: videoModalFade .2s ease;
+}
+
+.video-modal {
+  position: relative;
+  width: 75vw;
+  height: 75vh;
+  max-width: 1400px;
+  background: #080a0f;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .5);
+  display: flex;
+  flex-direction: column;
+}
+
+.video-modal > video {
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
+  background: #000;
+}
+
+.video-modal-title {
+  flex-shrink: 0;
+  padding: 12px 18px;
+  color: #fff;
+  font-size: 15px;
+  line-height: 1.5;
+  background: #10141d;
+  overflow-wrap: anywhere;
+}
+
+.video-modal-close {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .7);
+  color: white;
+  font-size: 28px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background .2s ease, transform .2s ease;
+}
+
+.video-modal-close:hover {
+  background: rgba(255, 255, 255, .2);
+  transform: scale(1.05);
+}
+
+@keyframes videoModalFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ==============================
+   RESPONSIVE
+   ============================== */
+
 @media (max-width: 850px) {
   .hero {
     padding: 55px 7%;
@@ -550,5 +664,29 @@ footer > span {
     align-items: start;
     flex-direction: column;
     padding: 24px 16px;
+  }
+
+  /* Popup trên điện thoại */
+  .video-modal-overlay {
+    padding: 12px;
+  }
+
+  .video-modal {
+    width: 94vw;
+    height: auto;
+    max-height: 85vh;
+    aspect-ratio: 16 / 10;
+  }
+
+  .video-modal-title {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .video-modal-close {
+    top: 8px;
+    right: 8px;
+    width: 34px;
+    height: 34px;
   }
 }

@@ -17,6 +17,9 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [adminOpen, setAdminOpen] = useState(false);
 
+  // Video đang mở trong popup
+  const [selectedVideo, setSelectedVideo] = useState(null);
+
   const isAdmin = user?.app_metadata?.role === "admin";
 
   async function loadVideos() {
@@ -48,6 +51,25 @@ export default function App() {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  // Đóng popup bằng phím Escape và khóa cuộn trang khi popup mở
+  useEffect(() => {
+    if (!selectedVideo) return;
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setSelectedVideo(null);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [selectedVideo]);
 
   async function login(e) {
     e.preventDefault();
@@ -149,6 +171,7 @@ export default function App() {
     const confirmed = window.confirm(
       `Bạn có chắc muốn xóa "${video.title}" không?`
     );
+
     if (!confirmed) return;
 
     setLoading(true);
@@ -171,8 +194,15 @@ export default function App() {
     setLoading(false);
 
     if (dbError) {
-      setMessage("File đã xóa nhưng chưa xóa được bản ghi: " + dbError.message);
+      setMessage(
+        "File đã xóa nhưng chưa xóa được bản ghi: " + dbError.message
+      );
       return;
+    }
+
+    // Nếu video đang mở trong popup thì đóng popup
+    if (selectedVideo?.id === video.id) {
+      setSelectedVideo(null);
     }
 
     setVideos((current) => current.filter((v) => v.id !== video.id));
@@ -193,6 +223,7 @@ export default function App() {
 
         <div className="top-actions">
           <span className="video-count">{videos.length} video</span>
+
           <button
             className="admin-toggle"
             onClick={() => setAdminOpen(!adminOpen)}
@@ -211,6 +242,7 @@ export default function App() {
                   <h2>Quản lý thư viện</h2>
                   <p>Bạn đang đăng nhập với quyền quản trị.</p>
                 </div>
+
                 <button className="outline-btn" onClick={logout}>
                   Đăng xuất
                 </button>
@@ -232,7 +264,9 @@ export default function App() {
                   <input
                     type="file"
                     accept="video/*"
-                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    onChange={(e) =>
+                      setFile(e.target.files?.[0] || null)
+                    }
                     required
                   />
                 </label>
@@ -251,7 +285,9 @@ export default function App() {
           ) : (
             <form className="login-form" onSubmit={login}>
               <h2>Đăng nhập quản trị</h2>
-              <p>Chỉ tài khoản quản trị được cấp quyền mới có thể upload.</p>
+              <p>
+                Chỉ tài khoản quản trị được cấp quyền mới có thể upload.
+              </p>
 
               <label>
                 Email
@@ -296,19 +332,23 @@ export default function App() {
         <section className="hero">
           <div className="hero-copy">
             <span className="eyebrow">KHO VIDEO CỦA BẠN</span>
+
             <h1>
               Mọi câu chuyện,
               <br />
               <span>trong một thư viện.</span>
             </h1>
+
             <p>
               Khám phá và thưởng thức những video được tuyển chọn,
               ở bất cứ đâu và trên mọi thiết bị.
             </p>
+
             <a href="#library" className="hero-link">
               Khám phá thư viện <span>↓</span>
             </a>
           </div>
+
           <div className="hero-art" aria-hidden="true">
             <div className="art-orbit orbit-one" />
             <div className="art-orbit orbit-two" />
@@ -323,6 +363,7 @@ export default function App() {
               <span className="eyebrow">THƯ VIỆN</span>
               <h2>Video mới nhất</h2>
             </div>
+
             <input
               className="search"
               type="search"
@@ -335,12 +376,17 @@ export default function App() {
           {filteredVideos.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">▷</div>
-              <h3>{search ? "Không tìm thấy video" : "Thư viện đang chờ bạn"}</h3>
+
+              <h3>
+                {search ? "Không tìm thấy video" : "Thư viện đang chờ bạn"}
+              </h3>
+
               <p>
                 {search
                   ? "Thử tìm bằng một từ khóa khác."
                   : "Các video bạn upload sẽ xuất hiện tại đây."}
               </p>
+
               {!search && !isAdmin && (
                 <button
                   className="outline-btn"
@@ -354,19 +400,35 @@ export default function App() {
             <div className="video-grid">
               {filteredVideos.map((video) => (
                 <article className="video-card" key={video.id}>
-                  <div className="video-player">
+                  <div
+                    className="video-player video-player-clickable"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Mở video ${video.title}`}
+                    onClick={() => setSelectedVideo(video)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedVideo(video);
+                      }
+                    }}
+                  >
                     <video
-                      controls
                       preload="metadata"
                       playsInline
+                      muted
                       src={video.public_url}
                     >
                       Trình duyệt của bạn không hỗ trợ phát video.
                     </video>
+
+                    <span className="video-play-overlay">▶</span>
                   </div>
+
                   <div className="video-info">
                     <div className="video-title-row">
                       <h3>{video.title}</h3>
+
                       {isAdmin && (
                         <button
                           className="delete-btn"
@@ -379,6 +441,7 @@ export default function App() {
                         </button>
                       )}
                     </div>
+
                     <p>
                       Đăng ngày{" "}
                       {new Date(video.created_at).toLocaleDateString("vi-VN")}
@@ -391,12 +454,56 @@ export default function App() {
         </section>
       </main>
 
+      {/* Popup phát video phóng to */}
+      {selectedVideo && (
+        <div
+          className="video-modal-overlay"
+          onClick={() => setSelectedVideo(null)}
+          role="presentation"
+        >
+          <div
+            className="video-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={selectedVideo.title}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="video-modal-close"
+              onClick={() => setSelectedVideo(null)}
+              aria-label="Đóng video"
+              title="Đóng"
+            >
+              ×
+            </button>
+
+            <video
+              key={selectedVideo.id}
+              src={selectedVideo.public_url}
+              controls
+              autoPlay
+              playsInline
+              preload="auto"
+            >
+              Trình duyệt của bạn không hỗ trợ phát video.
+            </video>
+
+            <div className="video-modal-title">
+              {selectedVideo.title}
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer>
         <a className="brand" href="#">
           <span className="brand-icon">▶</span>
           Video<span className="brand-accent">Library</span>
         </a>
-        <span>Thư viện video của bạn · © {new Date().getFullYear()}</span>
+
+        <span>
+          Thư viện video của bạn · © {new Date().getFullYear()}
+        </span>
       </footer>
     </div>
   );
