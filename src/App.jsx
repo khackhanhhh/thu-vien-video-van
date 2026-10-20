@@ -471,7 +471,7 @@ export default function App() {
             <div>
               <span className="section-sub-tag">— THƯ VIỆN VIDEO AI</span>
               <h2 className="section-main-title">
-                Các video học liệu phục vụ dạy học Ngữ văn ở trường phổ thông[cite: 1, 2]
+                Các video học liệu phục vụ dạy học Ngữ văn ở trường phổ thông.
               </h2>
             </div>
 
