@@ -5,6 +5,119 @@ import "./App.css";
 
 const BUCKET = "lesson-videos";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+const R2_PUBLIC_BASE_URL = (
+  import.meta.env.VITE_R2_PUBLIC_BASE_URL || ""
+).replace(/\/+$/, "");
+
+
+async function postApi(path, body) {
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError || !session?.access_token) {
+    throw new Error(
+      "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+    );
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || `Yêu cầu thất bại (HTTP ${response.status})`
+    );
+  }
+
+  return data;
+}
+
+
+async function uploadVideoToR2(file) {
+  if (!R2_PUBLIC_BASE_URL) {
+    throw new Error("Chưa cấu hình VITE_R2_PUBLIC_BASE_URL.");
+  }
+
+  const { key, uploadId, partSize, partCount } = await postApi(
+    "/api/uploads/init",
+    {
+      fileName: file.name,
+      contentType: file.type,
+      size: file.size,
+    }
+  );
+
+  const parts = [];
+
+  try {
+    for (let partNumber = 1; partNumber <= partCount; partNumber++) {
+      const start = (partNumber - 1) * partSize;
+      const end = Math.min(start + partSize, file.size);
+      const chunk = file.slice(start, end);
+
+      const { url } = await postApi("/api/uploads/part-url", {
+        key,
+        uploadId,
+        partNumber,
+      });
+
+      const response = await fetch(url, {
+        method: "PUT",
+        body: chunk,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload phần ${partNumber} thất bại.`);
+      }
+
+      const etag = response.headers.get("ETag");
+
+      if (!etag) {
+        throw new Error(
+          "Không đọc được ETag. Hãy kiểm tra CORS của bucket R2."
+        );
+      }
+
+      parts.push({ PartNumber: partNumber, ETag: etag });
+    }
+
+    await postApi("/api/uploads/complete", {
+      key,
+      uploadId,
+      parts,
+    });
+
+    return {
+      key,
+      storagePath: `r2:${key}`,
+      publicUrl: `${R2_PUBLIC_BASE_URL}/${key
+        .split("/")
+        .map(encodeURIComponent)
+        .join("/")}`,
+    };
+  } catch (error) {
+    try {
+      await postApi("/api/uploads/abort", { key, uploadId });
+    } catch {
+      // Giữ nguyên lỗi upload ban đầu.
+    }
+
+    throw error;
+  }
+}
+
+
 export default function App() {
   const [videos, setVideos] = useState([]);
   const [user, setUser] = useState(null);
@@ -103,67 +216,70 @@ export default function App() {
     setMessage("Bạn đã đăng xuất.");
   }
 
-  async function uploadVideo(e) {
-    e.preventDefault();
+  
+async function uploadVideo(e) {
+  e.preventDefault();
 
-    if (!isAdmin) {
-      setMessage("Bạn cần đăng nhập bằng tài khoản quản trị.");
-      return;
-    }
+  if (!isAdmin) {
+    setMessage("Bạn cần đăng nhập bằng tài khoản quản trị.");
+    return;
+  }
 
-    if (!title.trim() || !file) {
-      setMessage("Hãy nhập tiêu đề và chọn file video.");
-      return;
-    }
+  if (!title.trim() || !file) {
+    setMessage("Hãy nhập tiêu đề và chọn file video.");
+    return;
+  }
 
-    if (!file.type.startsWith("video/")) {
-      setMessage("Vui lòng chọn một file video hợp lệ.");
-      return;
-    }
+  if (!file.type.startsWith("video/")) {
+    setMessage("Vui lòng chọn một file video hợp lệ.");
+    return;
+  }
 
-    setLoading(true);
-    setMessage("Đang upload video...");
+  setLoading(true);
+  setMessage("Đang upload video lên Cloudflare R2...");
 
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `${crypto.randomUUID()}-${safeName}`;
+  let uploaded = null;
 
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, file, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      setLoading(false);
-      setMessage("Upload thất bại: " + uploadError.message);
-      return;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from(BUCKET)
-      .getPublicUrl(path);
+  try {
+    uploaded = await uploadVideoToR2(file);
 
     const { error: dbError } = await supabase.from("videos").insert({
       title: title.trim(),
-      storage_path: path,
-      public_url: urlData.publicUrl,
+      storage_path: uploaded.storagePath,
+      public_url: uploaded.publicUrl,
     });
 
     if (dbError) {
-      await supabase.storage.from(BUCKET).remove([path]);
-      setLoading(false);
-      setMessage("Không lưu được thông tin video: " + dbError.message);
-      return;
+      try {
+        await postApi("/api/objects/delete", { key: uploaded.key });
+      } catch {
+        console.error(
+          "Không thể dọn file R2 sau khi lưu metadata thất bại."
+        );
+      }
+
+      throw new Error(
+        "Video đã upload nhưng không lưu được thông tin: " +
+          dbError.message
+      );
     }
 
     setTitle("");
     setFile(null);
-    e.target.reset();
+
+    if (e.currentTarget instanceof HTMLFormElement) {
+      e.currentTarget.reset();
+    }
+
     await loadVideos();
+    setMessage("Upload video lên R2 thành công!");
+  } catch (error) {
+    setMessage("Upload thất bại: " + error.message);
+  } finally {
     setLoading(false);
-    setMessage("Upload video thành công!");
   }
+}
+
 
   async function deleteVideo(video) {
     if (!isAdmin) return;
